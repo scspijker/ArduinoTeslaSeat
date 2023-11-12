@@ -126,11 +126,11 @@ void loop() {
       for (int keyIndex = 0; keyIndex < amountOfKeysPerKeyboard; keyIndex++) {
         if (keyboardIsNearKey(keyboardValue, keyboardKeys[keyboardIndex][keyIndex].value)) {
           KeyboardKey keyPressed = keyboardKeys[keyboardIndex][keyIndex];
-          Serial.print(keyPressed.motor);
-          Serial.print(" ");
-          Serial.print(keyPressed.direction);
-          Serial.print(", activate relay ");
-          Serial.println(keyPressed.relayPin);
+          // Serial.print(keyPressed.motor);
+          // Serial.print(" ");
+          // Serial.print(keyPressed.direction);
+          // Serial.print(", activate relay ");
+          // Serial.println(keyPressed.relayPin);
           activateKeysRelay.add(keyPressed.relayPin);
         }
       }
@@ -152,10 +152,11 @@ void loop() {
       activatedRelays = activateKeysRelay;
       if (!activatedRelays.isEmpty()) {
         digitalWrite(LED_BUILTIN, HIGH);
-        Serial.print("Active relays: ");
+        Serial.print("Active relays");
         int n = activatedRelays.first();
         while (n != -1)
         {
+          Serial.print(", ");
           Serial.print(n);
           n = activatedRelays.next();
         }
@@ -167,8 +168,9 @@ void loop() {
     if (!activatedRelays.isEmpty()) {
       writeRelays(activatedRelays, HIGH);
       activatedRelays.clear();
+      Serial.println("All relays inactive.");
+      digitalWrite(LED_BUILTIN, LOW);
     }
-    digitalWrite(LED_BUILTIN, LOW);
   }
 
   delay(pollInterval);
