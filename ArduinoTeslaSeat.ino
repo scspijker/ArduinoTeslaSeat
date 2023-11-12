@@ -1,14 +1,11 @@
 #include <RingBuf.h>
-
-struct KeyboardKey {
-  int resistance;
-  String motor;
-  String direction;
-};
+#include "set.h"
 
 float measuringVoltage = 5.1675;
+int pollInterval = 5;
+int actInterval = 10;
 int keyboardAccuracy = 25;
-int keyboardMiniumValue = 10;
+int keyboardMiniumValue = 5;
 
 int amountOfKeyboards = 3;
 const int keyboardPins[3] = { A2, A1, A0 };
@@ -17,18 +14,33 @@ RingBuf<long, 10> keyboardBuffers[3] = {
   RingBuf<long, 10>(), RingBuf<long, 10>(), RingBuf<long, 10>()
 };
 
-int amountOfKeysPerKeyboard = 4;
-KeyboardKey keyboardKeys[3][4] = {
-  {{ 550, "Shift", "Forward" }, { 140, "Shift", "Backward" }, { 3896, "Tilt", "Up"}, { 1400, "Tilt", "Down"}},
-  {{ 3880, "Lift", "Up" }, { 1425, "Lift", "Down" }, { 580, "Recline", "Forward"}, { 142, "Recline", "Backward"}},
-  {{ 4820, "Lumbar Vertical", "Up" }, { 1055, "Lumbar Vertical", "Down" }, { 522, "Lumbar Horizontal", "Forward"},  { 2055, "Lumbar Horizontal", "Backward"}}
+struct KeyboardKey {
+  int value;
+  String motor;
+  String direction;
+  int relayPin;
 };
 
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
-  while (!Serial) { delay(10); }
+int amountOfKeysPerKeyboard = 4;
+KeyboardKey keyboardKeys[3][4] = {
+  {{ 658, "Shift", "Forward", 22 }, { 905, "Shift", "Backward", 23 }, { 208, "Tilt", "Up", 24 }, { 424, "Tilt", "Down", 25 }},
+  {{ 209, "Lift", "Up", 26 }, { 422, "Lift", "Down", 27 }, { 655, "Recline", "Forward", 28}, { 899, "Recline", "Backward", 29}},
+  {{ 175, "Lumbar Vertical", "Up", 30 }, { 499, "Lumbar Vertical", "Down", 31 }, { 687, "Lumbar Horizontal", "Forward", 32},  { 334, "Lumbar Horizontal", "Backward", 33}}
+};
 
+Set activatedRelays;
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+  for(int relayPin = 22; relayPin <= 38; relayPin++) {
+    digitalWrite(relayPin, HIGH); // Write first to prevent flickering
+    pinMode(relayPin, OUTPUT);
+  }
+
+  while (!Serial) { delay(10); }
   Serial.println("Setup complete...");
 }
 
@@ -36,20 +48,24 @@ int calculateResistanceFor(int keyboard) {
     int analogInputPin = keyboardPins[keyboard];
     int readValue = analogRead(analogInputPin);
 
-    // Voltage dividers on analog inputs with known resistor R1
-    float R1 = keyboardVoltageDividerResistance[keyboard];
-    float R1_Voltage = readValue / 1023.0 * measuringVoltage;
-    float R1_Current_mA = R1_Voltage * 1000.0 / R1;
-    
-    // Now we can calculate "unknown" R2
-    float R2_Voltage = measuringVoltage - R1_Voltage;
-    int R2 = (int) (R2_Voltage / R1_Current_mA * 1000.0);
+    // We can do all this to be fancy, or we can save CPU cycles 🤷
 
-    return R2;
+    // // Voltage dividers on analog inputs with known resistor R1
+    // float R1 = keyboardVoltageDividerResistance[keyboard];
+    // float R1_Voltage = readValue / 1023.0 * measuringVoltage;
+    // float R1_Current_mA = R1_Voltage * 1000.0 / R1;
+    
+    // // Now we can calculate "unknown" R2
+    // float R2_Voltage = measuringVoltage - R1_Voltage;
+    // int R2 = (int) (R2_Voltage / R1_Current_mA * 1000.0);
+
+    // return R2;
+
+    return readValue;
 }
 
-bool keyboardIsNearKey(int keyboardResistance, int keyResistance) {
-  return (keyboardResistance - 100 < keyResistance) && (keyboardResistance + 100 > keyResistance);
+bool keyboardIsNearKey(int keyboardValue, int keyValue) {
+  return (keyboardValue - keyboardAccuracy < keyValue) && (keyboardValue + keyboardAccuracy > keyValue);
 }
 
 int debounce(int keyboardIndex) {
@@ -70,6 +86,15 @@ int debounce(int keyboardIndex) {
   return average;
 }
 
+void writeRelays(Set relayPins, int state) {
+    int n = relayPins.first();
+    while (n != -1)
+    {
+      digitalWrite(n, state);
+      n = relayPins.next();
+    }
+}
+
 int l = 0;
 void loop() {
 
@@ -87,10 +112,11 @@ void loop() {
   }
 
   // Stop when there is no interaction
-  l = interaction ? l + 1 : 0;
-  if (l == 10) {
+  l++;
+  if (interaction && l >= actInterval) {
     l = 0;
 
+    Set activateKeysRelay;
     for (int keyboardIndex = 0; keyboardIndex < amountOfKeyboards; keyboardIndex++) {
       int keyboardValue = debounce(keyboardIndex);
 
@@ -98,16 +124,53 @@ void loop() {
 
       // Check keys
       for (int keyIndex = 0; keyIndex < amountOfKeysPerKeyboard; keyIndex++) {
-        if (keyboardIsNearKey(keyboardValue, keyboardKeys[keyboardIndex][keyIndex].resistance)) {
+        if (keyboardIsNearKey(keyboardValue, keyboardKeys[keyboardIndex][keyIndex].value)) {
           KeyboardKey keyPressed = keyboardKeys[keyboardIndex][keyIndex];
           Serial.print(keyPressed.motor);
           Serial.print(" ");
-          Serial.println(keyPressed.direction);
+          Serial.print(keyPressed.direction);
+          Serial.print(", activate relay ");
+          Serial.println(keyPressed.relayPin);
+          activateKeysRelay.add(keyPressed.relayPin);
         }
       }
     }
+
+    if (activatedRelays != activateKeysRelay) {
+
+      Set deactivateRelays = activatedRelays - activateKeysRelay;
+      Set activateRelays = activateKeysRelay - activatedRelays;
+
+      if (!deactivateRelays.isEmpty()) {
+        writeRelays(deactivateRelays, HIGH);
+      }
+      
+      if (!activateRelays.isEmpty()) {
+        writeRelays(activateRelays, LOW);
+      }
+
+      activatedRelays = activateKeysRelay;
+      if (!activatedRelays.isEmpty()) {
+        digitalWrite(LED_BUILTIN, HIGH);
+        Serial.print("Active relays: ");
+        int n = activatedRelays.first();
+        while (n != -1)
+        {
+          Serial.print(n);
+          n = activatedRelays.next();
+        }
+        Serial.println(".");
+      }
+    }
+  } else if (!interaction) {
+    l = 0;
+    if (!activatedRelays.isEmpty()) {
+      writeRelays(activatedRelays, HIGH);
+      activatedRelays.clear();
+    }
+    digitalWrite(LED_BUILTIN, LOW);
   }
 
-  delay(10);
+  delay(pollInterval);
 }
 
