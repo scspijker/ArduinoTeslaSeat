@@ -2,9 +2,13 @@
 
 Using an Arduino Mega 2560 to read Tesla seat controls and power the motors through a 16 relais board. Building my own playseat.
 
-Please excuse my ugly procedural code, I've not done this in a while, as I normally work with Functional or OO languages. I might clean this up in the future, but probably not ;P
+Please excuse my less-than-pretty procedural code, I've not done this in a while, as I normally work with Functional or OO languages. I might clean this up in the future, but probably not, since this is a hobby project ;P
 
 **WARNING:** Please be mindful when messing with seat cables and harnesses, the airbag in a Tesla seat is an explosive device! On modern Tesla's these connectors are colored yellow. Prevent applying any kind of power to airbag _at all times_!
+
+## Tesla Seat Wiring
+
+Tesla has _excellent_ wiring diagrams available **for free** on their website. You do need to create a (free) account. All Tesla models and model years available. I used the [Model X wiring diagrams](https://service.tesla.com/docs/ModelX/Circuit_Reference/) for my seat.
 
 ## Reading the seat controls
 
@@ -12,7 +16,7 @@ Please excuse my ugly procedural code, I've not done this in a while, as I norma
 
 Tesla seat controls are incredibly simple. Each button has a resistor and is connected a signal line. There are 12 buttons on my Tesla Model X driver's seat, and 3 signal lines. I'm using the board in reverse (no problem, since resistors are passive), supplying 5V to the GND of the seat control keyboard, and measuing on the signal lines using the ADC's.
 
-Each signal line is connected to an ADC input of your arduino through a voltage divider to ground. Google "voltage divider", it's basically one extra resistor to ground. The keyboard is our Vin and has an unknown resistance (depending on which buttons you are pressing. We're measuring at Vout. There should be a known value resistor between the measuring point and ground, set this in the code.
+Each signal line is connected to an ADC input of your arduino through a voltage divider to ground. Google "voltage divider", it's basically one extra resistor to ground. The keyboard is our Vin and has an unknown resistance (depending on which buttons you are pressing. We're measuring at Vout. There should be a known value resistor between the measuring point and ground, set this in the code, I used 1k Ohm resistors.
 
 ## Driving Tesla seat motors
 
@@ -28,7 +32,7 @@ A relay does not simply switch between "off" and "connected", but switches betwe
 
 When I need to turn a motor, I close one of the relays. Close relay 1: turn in a direction, close relay 2: turn in the other direction.
 
-When no relays are turned on, everything is grounded. In theory you could switch the sides around, because the motors won't turn either when everything is connected to 12 volt positive/PWR. But usually car's are chassis negative, so I stuck to that, since this reduces the chance or shorting something.
+When no relays are turned on, everything is grounded. In theory you could switch the sides around, because the motors won't turn either when everything is connected to 12 volt positive/PWR. But usually car's are chassis negative, so I stuck to that, since this reduces the chance of shorting something.
 
 ## No headrest button?
 
