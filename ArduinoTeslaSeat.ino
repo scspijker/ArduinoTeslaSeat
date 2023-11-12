@@ -2,8 +2,8 @@
 #include "set.h"
 
 float measuringVoltage = 5.1675;
-int pollInterval = 5;
-int actInterval = 10;
+int pollInterval = 8;
+int actInterval = 8;
 int keyboardAccuracy = 25;
 int keyboardMiniumValue = 5;
 
@@ -19,13 +19,15 @@ struct KeyboardKey {
   String motor;
   String direction;
   int relayPin;
+  int secondaryRelayPin;
 };
 
 int amountOfKeysPerKeyboard = 4;
-KeyboardKey keyboardKeys[3][4] = {
-  {{ 658, "Shift", "Forward", 22 }, { 905, "Shift", "Backward", 23 }, { 208, "Tilt", "Up", 24 }, { 424, "Tilt", "Down", 25 }},
-  {{ 209, "Lift", "Up", 26 }, { 422, "Lift", "Down", 27 }, { 655, "Recline", "Forward", 28}, { 899, "Recline", "Backward", 29}},
-  {{ 175, "Lumbar Vertical", "Up", 30 }, { 499, "Lumbar Vertical", "Down", 31 }, { 687, "Lumbar Horizontal", "Forward", 32},  { 334, "Lumbar Horizontal", "Backward", 33}}
+KeyboardKey keyboardKeys[4][4] = {
+  {{ 658, "Shift", "Forward", 28 }, { 905, "Shift", "Backward", 29 }, { 208, "Tilt", "Up", 25 }, { 424, "Tilt", "Down", 22 }},
+  {{ 209, "Lift", "Up", 24 }, { 422, "Lift", "Down", 26, 27 }, { 655, "Recline", "Forward", 27}, { 899, "Recline", "Backward", 26, 24 }},
+  {{ 175, "Lumbar Vertical", "Up", 32 }, { 499, "Lumbar Vertical", "Down", 33, 30 }, { 687, "Lumbar Horizontal", "Forward", 30},  { 334, "Lumbar Horizontal", "Backward", 33, 32 }},
+  {{ 999, "Headrest", "Up", 31}, { 9999, "Headrest", "Down", 29}, {}, {}}
 };
 
 Set activatedRelays;
@@ -96,7 +98,10 @@ void writeRelays(Set relayPins, int state) {
 }
 
 int l = 0;
+unsigned long previousMillis = 0;        // will store last time the loop was called
 void loop() {
+  if (previousMillis + pollInterval > millis()) return;
+  previousMillis = millis();
 
   // Fast stuff
   bool interaction = false;
@@ -132,6 +137,13 @@ void loop() {
           // Serial.print(", activate relay ");
           // Serial.println(keyPressed.relayPin);
           activateKeysRelay.add(keyPressed.relayPin);
+
+          if (keyPressed.secondaryRelayPin > 0) {
+            // Some DOWN/BACK's are shared. So we switch on
+            // the other motor's UP/FORWARD, so for the other motor
+            // both leads are positive and no movement will ensue.
+            activateKeysRelay.add(keyPressed.secondaryRelayPin);
+          }
         }
       }
     }
@@ -172,7 +184,5 @@ void loop() {
       digitalWrite(LED_BUILTIN, LOW);
     }
   }
-
-  delay(pollInterval);
 }
 
