@@ -8,6 +8,8 @@ Please excuse my ugly procedural code, I've not done this in a while, as I norma
 
 ## Reading the seat controls
 
+![Tesla seat control board](tesla_seat_control_board.jpeg "Tesla seat control board")
+
 Tesla seat controls are incredibly simple. Each button has a resistor and is connected a signal line. There are 12 buttons on my Tesla Model X driver's seat, and 3 signal lines. I'm using the board in reverse (no problem, since resistors are passive), supplying 5V to the GND of the seat control keyboard, and measuing on the signal lines using the ADC's.
 
 Each signal line is connected to an ADC input of your arduino through a voltage divider to ground. Google "voltage divider", it's basically one extra resistor to ground. The keyboard is our Vin and has an unknown resistance (depending on which buttons you are pressing. We're measuring at Vout. There should be a known value resistor between the measuring point and ground, set this in the code.
@@ -15,6 +17,8 @@ Each signal line is connected to an ADC input of your arduino through a voltage 
 ## Driving Tesla seat motors
 
 I couldn't get the seat module in my driver's side seat to function. I guess it needs a CAN or LIN connection to do something. I decided to cut the seat module out of the seat, and just drive the seat motors directly. I decided to do this with a cheap 16 relay board, allowing me to drive up to 8 DC motors.
+
+![Arduino with 16 relay board](arduino_mega_2560_with_relay_board.jpeg "Arduino with 16 relay board")
 
 Using mosfets or even ESC's might be a better idea, but I kept it simple.
 
