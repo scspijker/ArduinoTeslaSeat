@@ -2,10 +2,14 @@
 #include "ESP32RelayClass.ino"
 #include "TelnetClass.ino"
 #include "TeslaSeatController.ino"
+#include "TeslaSeatControls.ino"
 
 // Create relay board instance with pin configuration
 // Pin assignments: latchPin=12, clockPin=13, dataPin=14, oePin=5
 RelayBoard relayBoard(12, 13, 14, 5);
+
+// Loop speed
+const unsigned long loopDelayMs = 2;
 
 // Setup Telnet instance
 Telnet telnet(23);
@@ -13,9 +17,14 @@ Telnet telnet(23);
 // Setup TeslaSeatController instance
 TeslaSeatController seatController(relayBoard);
 
+// Setup TeslaSeatControls instance
+TeslaSeatControls seatControls;
+
 // WiFi credentials from build flags in platformio.ini
 const char* wifiSsid = WIFI_SSID;
 const char* wifiPassword = WIFI_PASSWORD;
+unsigned long lastActivity = millis();
+unsigned long wifiTimeout = 1000 * 60 * 15; // 15 minutes
 
 void setup() {
   Serial.begin(115200);
@@ -25,6 +34,16 @@ void setup() {
   relayBoard.begin();
   logln("done! ");
 
+  startWifi(true);
+
+  log("Setting up seat controls... ");
+  seatControls.begin();
+  logln("done!");
+
+  logln("Startup sequence complete!");
+}
+
+void startWifi(boolean firstTime) {
   if (wifiSsid != nullptr && strlen(wifiSsid) > 1 && wifiPassword != nullptr && strlen(wifiPassword) > 1) {
     logln("Setting up WiFi... ");
     WiFi.mode(WIFI_STA);
@@ -35,16 +54,46 @@ void setup() {
       logf("Connected with IP: %s\n", WiFi.localIP().toString().c_str());
       telnet.setup();
     }
-  } else {
+  } else if (firstTime) {
     logln("WiFi credentials not set, skipping WiFi and Telnet setup.");
   }
+}
 
-  logln("Startup sequence complete!");
+void stopWifi() {
+  logln("Stopping WiFi to save power...");
+  telnet.disconnect();
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
 }
 
 void loop() {
-  handleTelnet();
-  delay(5);
+  unsigned long now = millis();
+
+  // Slow 1 second loop with modulo
+  if (now % 1000 < loopDelayMs) {
+    if (WiFi.status() == WL_CONNECTED && now - lastActivity >= wifiTimeout) {
+      stopWifi();
+    } else if (WiFi.status() != WL_CONNECTED && now - lastActivity < wifiTimeout) {
+      startWifi(false);
+    }
+  }
+
+  // Medium 100ms loop
+  if (now % 100 < loopDelayMs) {
+    handleTelnet();
+  }
+
+  // Fast loop
+  handleSeatControls();
+  delay(loopDelayMs);
+}
+
+void handleSeatControls() {
+  ControlEvent controlEvent = seatControls.loop();
+  if (controlEvent.event != Event::UNKNOWN) {
+    lastActivity = millis();
+    handleSeatCommand(controlEvent.event, controlEvent.direction, controlEvent.state);
+  }
 }
 
 void handleTelnet() {
@@ -54,6 +103,8 @@ void handleTelnet() {
 
   TelnetResult lastResult = telnet.loop();
   if (lastResult.event != Event::UNKNOWN) {
+
+    lastActivity = millis();
 
     if (pendingCommand != Event::UNKNOWN) {
       // If a command is already pending, release it first

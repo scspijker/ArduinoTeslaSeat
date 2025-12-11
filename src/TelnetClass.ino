@@ -3,7 +3,6 @@
 
 #include <WiFi.h>
 #include <Arduino.h>
-#include "TeslaSeatController.ino"
 #include "TeslaSeatEvents.ino"
 
 struct TelnetResult {
@@ -21,7 +20,6 @@ private:
       String _cmdBuffer;
       WiFiServer telnetServer;
       WiFiClient telnetClient;
-      TelnetResult _lastResult;
       TelnetResult repeatResult;
       
       bool authenticated = false;
@@ -44,15 +42,16 @@ private:
             }
       }
 
-      void readClient() {
-            if (!(telnetClient && telnetClient.connected())) return;
+      TelnetResult readClient() {
+            if (!(telnetClient && telnetClient.connected())) return TelnetResult();
 
             while (telnetClient.available()) {
                   char c = (char)telnetClient.read();
                   if (c == '\r' || c == '\n') {
                         if (_cmdBuffer.length() > 0) {
-                              _lastResult = processCommand(_cmdBuffer);
+                              TelnetResult result = processCommand(_cmdBuffer);
                               _cmdBuffer = "";
+                              return result;
                         }
                   } else if ((c >= 48 && c <= 57) || // 0-9
                              (c >= 65 && c <= 90) || // A-Z
@@ -69,6 +68,8 @@ private:
                   }
 
             }
+
+            return TelnetResult();
       }
 
       TelnetResult processCommand(String cmd) {
@@ -251,25 +252,27 @@ public:
 
       void disconnect() {
             authenticated = false;
-            telnetClient.stop();
+            if(telnetClient) {
+                  telnetClient.stop();
+            }
       }
 
       TelnetResult loop() {
-            // Check for disconnection first
-            if (telnetClient && !telnetClient.connected()) {
-                  disconnect();
+            if (telnetClient) {
+                  // Check for disconnection first
+                  if (!telnetClient.connected()) {
+                        disconnect();
+                  }
             }
 
             acceptClient();
-            readClient();
+            TelnetResult result = readClient();
 
-            if (_lastResult.event != Event::UNKNOWN) {
-                  repeatResult = _lastResult;
-                  _lastResult = TelnetResult();
-                  return repeatResult;
+            if (result.event != Event::UNKNOWN) {
+                  repeatResult = result;
             }
 
-            return _lastResult;
+            return result;
       }
 
       void println(const String &msg) {

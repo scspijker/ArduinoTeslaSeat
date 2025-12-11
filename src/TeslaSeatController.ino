@@ -8,10 +8,14 @@ class TeslaSeatController {
 private:
   RelayBoard& relayBoard;
 
+  // Last time seat was moved horizontally
+  unsigned long lastSeatHorizontalMove = 0;
+
 public:
   TeslaSeatController(RelayBoard& rb) : relayBoard(rb) {}
 
   void moveSeat(HorizontalDirection dir, ButtonEvent event) {
+    lastSeatHorizontalMove = millis();
     if (event == ButtonEvent::PRESSED) {
       if (dir == HorizontalDirection::FORWARD) {
         relayBoard.setRelay(2, false);
@@ -87,57 +91,63 @@ public:
   void moveHeadRest(VerticalDirection dir, ButtonEvent event) {
     if (event == ButtonEvent::PRESSED) {
       if (dir == VerticalDirection::UP) {
-        relayBoard.setRelay(9, false);
+        relayBoard.setRelay(16, false);
         relayBoard.setRelay(8, true);
       } else if (dir == VerticalDirection::DOWN) {
         relayBoard.setRelay(8, false);
-        relayBoard.setRelay(9, true);
+        relayBoard.setRelay(16, true);
       }
     } else if (event == ButtonEvent::RELEASED) {
       relayBoard.setRelay(8, false);
-      relayBoard.setRelay(9, false);
+      relayBoard.setRelay(16, false);
     }
   }
 
   void moveLumbar(HorizontalDirection dir, ButtonEvent event) {
     if (event == ButtonEvent::PRESSED) {
       if (dir == HorizontalDirection::FORWARD) {
-        relayBoard.setRelay(11, false);
-        relayBoard.setRelay(10, false); // Also coupled to 11, so switch together to prevent moving two things at once
+        relayBoard.setRelay(14, false);
+        relayBoard.setRelay(15, false); // Also coupled to 14, so switch together to prevent moving two things at once
 
-        relayBoard.setRelay(12, true);
+        relayBoard.setRelay(13, true);
       } else if (dir == HorizontalDirection::BACK) {
-        relayBoard.setRelay(12, false);
+        relayBoard.setRelay(13, false);
 
-        relayBoard.setRelay(11, true);
-        relayBoard.setRelay(10, true); // Also coupled to 11, so switch together to prevent moving two things at once
+        relayBoard.setRelay(14, true);
+        relayBoard.setRelay(15, true); // Also coupled to 14, so switch together to prevent moving two things at once
       }
     } else if (event == ButtonEvent::RELEASED) {
-      relayBoard.setRelay(11, false);
-      relayBoard.setRelay(10, false); // Also coupled to 11, so switch together to prevent moving two things at once
+      relayBoard.setRelay(14, false);
+      relayBoard.setRelay(15, false); // Also coupled to 14, so switch together to prevent moving two things at once
 
-      relayBoard.setRelay(12, false);
+      relayBoard.setRelay(13, false);
     }
   }
 
   void moveLumbar(VerticalDirection dir, ButtonEvent event) {
+    // If seat was moved horizontally in the last 10 seconds, move headrest instead of lumbar
+    if (millis() - lastSeatHorizontalMove < 10000) {
+      moveHeadRest(dir, event);
+      return;
+    }
+
     if (event == ButtonEvent::PRESSED) {
       if (dir == VerticalDirection::UP) {
-        relayBoard.setRelay(11, false);
-        relayBoard.setRelay(12, false); // Also coupled to 11, so switch together to prevent moving two things at once
+        relayBoard.setRelay(14, false);
+        relayBoard.setRelay(13, false); // Also coupled to 14, so switch together to prevent moving two things at once
 
-        relayBoard.setRelay(10, true);
+        relayBoard.setRelay(15, true);
       } else if (dir == VerticalDirection::DOWN) {
-        relayBoard.setRelay(10, false);
+        relayBoard.setRelay(15, false);
 
-        relayBoard.setRelay(11, true);
-        relayBoard.setRelay(12, true); // Also coupled to 11, so switch together to prevent moving two things at once
+        relayBoard.setRelay(14, true);
+        relayBoard.setRelay(13, true); // Also coupled to 14, so switch together to prevent moving two things at once
       }
     } else if (event == ButtonEvent::RELEASED) {
-      relayBoard.setRelay(11, false);
-      relayBoard.setRelay(12, false); // Also coupled to 11, so switch together to prevent moving two things at once
+      relayBoard.setRelay(14, false);
+      relayBoard.setRelay(13, false); // Also coupled to 14, so switch together to prevent moving two things at once
       
-      relayBoard.setRelay(10, false);
+      relayBoard.setRelay(15, false);
     }
   }
 };
