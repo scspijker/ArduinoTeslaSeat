@@ -70,7 +70,7 @@ void loop() {
   unsigned long now = millis();
 
   // Slow 1 second loop with modulo
-  if (now % 1000 < loopDelayMs) {
+  if (now % 5000 < loopDelayMs) {
     if (WiFi.status() == WL_CONNECTED && now - lastActivity >= wifiTimeout) {
       stopWifi();
     } else if (WiFi.status() != WL_CONNECTED && now - lastActivity < wifiTimeout) {
